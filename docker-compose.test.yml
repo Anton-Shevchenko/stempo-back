@@ -1,0 +1,20 @@
+services:
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: stempo_postgres_test
+    environment:
+      POSTGRES_USER: stempo_test
+      POSTGRES_PASSWORD: stempo_test_password
+      POSTGRES_DB: stempo_test_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stempo_test -d stempo_test_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_test_data:

@@ -1,0 +1,13 @@
+.env
+*.log
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+dist/
+build/
+.DS_Store

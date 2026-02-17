@@ -1,0 +1,62 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: stempo
+          POSTGRES_PASSWORD: stempo_password
+          POSTGRES_DB: stempo_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run tests
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: stempo
+        DB_PASSWORD: stempo_password
+        DB_NAME: stempo_db
+        JWT_SECRET: test-secret-key
+      run: go test ./... -v
+    
+    - name: Generate coverage
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: stempo
+        DB_PASSWORD: stempo_password
+        DB_NAME: stempo_db
+        JWT_SECRET: test-secret-key
+      run: go test ./... -coverprofile=coverage.out
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
