@@ -61,6 +61,11 @@ func (u *bonusProgramUsecase) Create(program *entity.BonusProgram, userID uint) 
 	program.Status = entity.BonusProgramStatusPending
 	program.RejectionReason = nil
 
+	// QR expiration for temporary QR: 1-10 minutes, default 3
+	if program.QRExpirationMinutes < 1 || program.QRExpirationMinutes > 10 {
+		program.QRExpirationMinutes = 3
+	}
+
 	return u.programRepo.Create(program)
 }
 
@@ -138,6 +143,11 @@ func (u *bonusProgramUsecase) Update(program *entity.BonusProgram, userID uint) 
 			// Preserve existing status for all other cases
 			program.Status = existing.Status
 		}
+	}
+
+	// QR expiration for temporary QR: 1-10 minutes, default 3
+	if program.QRExpirationMinutes < 1 || program.QRExpirationMinutes > 10 {
+		program.QRExpirationMinutes = 3
 	}
 
 	return u.programRepo.Update(program)

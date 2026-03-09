@@ -10,7 +10,7 @@ import (
 )
 
 type QRCodeUsecase interface {
-	Generate(programID uint, qrType entity.QRCodeType, expirationHours *int, userID uint) (*entity.QRCode, error)
+	Generate(programID uint, qrType entity.QRCodeType, userID uint) (*entity.QRCode, error)
 	Validate(code string) (*entity.QRCode, error)
 	GetByProgramID(programID uint, userID uint) ([]entity.QRCode, error)
 	GetByBusinessID(businessID uint, userID uint) ([]entity.QRCode, error)
@@ -18,9 +18,9 @@ type QRCodeUsecase interface {
 }
 
 type qrCodeUsecase struct {
-	qrCodeRepo    repository.QRCodeRepository
-	programRepo   repository.BonusProgramRepository
-	businessRepo  repository.BusinessRepository
+	qrCodeRepo   repository.QRCodeRepository
+	programRepo  repository.BonusProgramRepository
+	businessRepo repository.BusinessRepository
 }
 
 func NewQRCodeUsecase(
@@ -35,11 +35,16 @@ func NewQRCodeUsecase(
 	}
 }
 
-func (u *qrCodeUsecase) Generate(programID uint, qrType entity.QRCodeType, expirationHours *int, userID uint) (*entity.QRCode, error) {
+func (u *qrCodeUsecase) Generate(programID uint, qrType entity.QRCodeType, userID uint) (*entity.QRCode, error) {
 	// Verify program exists and user owns the business
 	program, err := u.programRepo.FindByID(programID)
 	if err != nil {
 		return nil, errors.New("bonus program not found")
+	}
+
+	// Cannot generate QR for unapproved programs
+	if program.Status != entity.BonusProgramStatusApproved && program.Status != entity.BonusProgramStatusActive {
+		return nil, errors.New("cannot generate QR for unapproved bonus program")
 	}
 
 	business, err := u.businessRepo.FindByID(program.BusinessID)
@@ -57,25 +62,27 @@ func (u *qrCodeUsecase) Generate(programID uint, qrType entity.QRCodeType, expir
 		return nil, errors.New("failed to generate QR code")
 	}
 
-	// Set expiration for temporary QR codes
+	// Set expiration for temporary QR codes (use program's QRExpirationMinutes: 1-10, default 3)
 	var expiresAt *time.Time
 	if qrType == entity.QRCodeTypeTemporary {
-		if expirationHours == nil || *expirationHours <= 0 {
-			// Default to 24 hours for temporary QR codes
-			defaultHours := 24
-			expirationHours = &defaultHours
+		minutes := program.QRExpirationMinutes
+		if minutes < 1 {
+			minutes = 3
 		}
-		exp := time.Now().Add(time.Duration(*expirationHours) * time.Hour)
+		if minutes > 10 {
+			minutes = 10
+		}
+		exp := time.Now().Add(time.Duration(minutes) * time.Minute)
 		expiresAt = &exp
 	}
 
 	qrCode := &entity.QRCode{
-		Code:          code,
-		Type:          qrType,
+		Code:           code,
+		Type:           qrType,
 		BonusProgramID: programID,
-		BusinessID:    program.BusinessID,
-		ExpiresAt:     expiresAt,
-		IsActive:      true,
+		BusinessID:     program.BusinessID,
+		ExpiresAt:      expiresAt,
+		IsActive:       true,
 	}
 
 	if err := u.qrCodeRepo.Create(qrCode); err != nil {

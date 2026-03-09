@@ -38,6 +38,14 @@ func (m *MockAuthUsecase) Refresh(refreshToken string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockAuthUsecase) UpdateProfile(userID uint, name, phone *string, cityID *uint) (*entity.User, error) {
+	args := m.Called(userID, name, phone, cityID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.User), args.Error(1)
+}
+
 func (m *MockAuthUsecase) GetCurrentUser(userID uint) (*entity.User, error) {
 	args := m.Called(userID)
 	if args.Get(0) == nil {

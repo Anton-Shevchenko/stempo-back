@@ -21,9 +21,8 @@ func NewQRCodeHandler(qrCodeUsecase usecase.QRCodeUsecase) *QRCodeHandler {
 }
 
 type GenerateQRRequest struct {
-	ProgramID       uint                `json:"programId" binding:"required"`
-	Type            entity.QRCodeType   `json:"type" binding:"required"`
-	ExpirationHours *int                `json:"expirationHours,omitempty"`
+	ProgramID uint              `json:"programId" binding:"required"`
+	Type      entity.QRCodeType `json:"type" binding:"required"`
 }
 
 func (h *QRCodeHandler) Generate(c *gin.Context) {
@@ -45,7 +44,7 @@ func (h *QRCodeHandler) Generate(c *gin.Context) {
 		return
 	}
 
-	qrCode, err := h.qrCodeUsecase.Generate(req.ProgramID, req.Type, req.ExpirationHours, userID)
+	qrCode, err := h.qrCodeUsecase.Generate(req.ProgramID, req.Type, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
