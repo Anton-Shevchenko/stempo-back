@@ -15,7 +15,11 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /stempo
-            docker-compose pull
-            docker-compose up -d
-            docker image prune -f
+            echo "--- Checking current directory ---"
+            pwd
+            echo "--- Listing files in the project folder ---"
+            ls -la /path/to/your/app
+            echo "--- Checking Docker version ---"
+            docker compose version || docker-compose version
+            echo "--- Starting Deployment ---"
+            cd /path/to/your/app && docker compose pull && docker compose up -d
