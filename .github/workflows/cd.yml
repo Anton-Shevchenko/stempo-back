@@ -18,8 +18,8 @@ jobs:
             echo "--- Checking current directory ---"
             pwd
             echo "--- Listing files in the project folder ---"
-            ls -la /stempo
+            ls -la /root/stempo
             echo "--- Checking Docker version ---"
             docker compose version || docker-compose version
             echo "--- Starting Deployment ---"
-            cd /stempo && docker compose pull && docker compose up -d
+            cd /root/stempo && docker compose pull && docker compose up -d
