@@ -35,6 +35,11 @@ func (m *MockBonusProgramRepository) FindAll(page, pageSize int) ([]entity.Bonus
 	return args.Get(0).([]entity.BonusProgram), args.Get(1).(int64), args.Error(2)
 }
 
+func (m *MockBonusProgramRepository) FindByStatus(status entity.BonusProgramStatus, page, pageSize int) ([]entity.BonusProgram, int64, error) {
+	args := m.Called(status, page, pageSize)
+	return args.Get(0).([]entity.BonusProgram), args.Get(1).(int64), args.Error(2)
+}
+
 func (m *MockBonusProgramRepository) Update(program *entity.BonusProgram) error {
 	args := m.Called(program)
 	return args.Error(0)
@@ -157,8 +162,8 @@ func TestBonusProgramUsecase_Delete(t *testing.T) {
 			mockBusinessRepo := new(MockBusinessRepository)
 
 			program := &entity.BonusProgram{
-				ID:          tt.programID,
-				BusinessID:  tt.businessID,
+				ID:         tt.programID,
+				BusinessID: tt.businessID,
 			}
 
 			business := &entity.Business{

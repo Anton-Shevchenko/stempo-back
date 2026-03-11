@@ -38,9 +38,24 @@ func (m *MockBusinessRepository) FindFeatured() ([]entity.Business, error) {
 	return args.Get(0).([]entity.Business), args.Error(1)
 }
 
+func (m *MockBusinessRepository) FindByCategory(category string) ([]entity.Business, error) {
+	args := m.Called(category)
+	return args.Get(0).([]entity.Business), args.Error(1)
+}
+
 func (m *MockBusinessRepository) FindAll(page, pageSize int) ([]entity.Business, int64, error) {
 	args := m.Called(page, pageSize)
 	return args.Get(0).([]entity.Business), args.Get(1).(int64), args.Error(2)
+}
+
+func (m *MockBusinessRepository) FindByStatus(status entity.BusinessStatus, page, pageSize int) ([]entity.Business, int64, error) {
+	args := m.Called(status, page, pageSize)
+	return args.Get(0).([]entity.Business), args.Get(1).(int64), args.Error(2)
+}
+
+func (m *MockBusinessRepository) FindNewest(limit int) ([]entity.Business, error) {
+	args := m.Called(limit)
+	return args.Get(0).([]entity.Business), args.Error(1)
 }
 
 func (m *MockBusinessRepository) Update(business *entity.Business) error {
@@ -50,6 +65,11 @@ func (m *MockBusinessRepository) Update(business *entity.Business) error {
 
 func (m *MockBusinessRepository) Delete(id uint) error {
 	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *MockBusinessRepository) UpdateFields(id uint, updates map[string]interface{}) error {
+	args := m.Called(id, updates)
 	return args.Error(0)
 }
 

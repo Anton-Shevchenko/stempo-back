@@ -48,6 +48,31 @@ func (m *MockBusinessUsecase) GetAll(page, pageSize int) ([]entity.Business, int
 	return args.Get(0).([]entity.Business), args.Get(1).(int64), args.Error(2)
 }
 
+func (m *MockBusinessUsecase) GetByCategory(category string) ([]entity.Business, error) {
+	args := m.Called(category)
+	return args.Get(0).([]entity.Business), args.Error(1)
+}
+
+func (m *MockBusinessUsecase) GetNewest(limit int) ([]entity.Business, error) {
+	args := m.Called(limit)
+	return args.Get(0).([]entity.Business), args.Error(1)
+}
+
+func (m *MockBusinessUsecase) GetByStatus(status entity.BusinessStatus, page, pageSize int) ([]entity.Business, int64, error) {
+	args := m.Called(status, page, pageSize)
+	return args.Get(0).([]entity.Business), args.Get(1).(int64), args.Error(2)
+}
+
+func (m *MockBusinessUsecase) Approve(id uint) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *MockBusinessUsecase) Reject(id uint, reason string) error {
+	args := m.Called(id, reason)
+	return args.Error(0)
+}
+
 func (m *MockBusinessUsecase) Update(business *entity.Business, userID uint) error {
 	args := m.Called(business, userID)
 	return args.Error(0)
@@ -55,6 +80,11 @@ func (m *MockBusinessUsecase) Update(business *entity.Business, userID uint) err
 
 func (m *MockBusinessUsecase) Delete(id, userID uint) error {
 	args := m.Called(id, userID)
+	return args.Error(0)
+}
+
+func (m *MockBusinessUsecase) UpdateFields(id uint, updates map[string]interface{}) error {
+	args := m.Called(id, updates)
 	return args.Error(0)
 }
 

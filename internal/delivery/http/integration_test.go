@@ -28,9 +28,9 @@ const testJWTSecret = "test-secret-key-for-testing-only"
 
 type APITestSuite struct {
 	suite.Suite
-	db     *gorm.DB
-	router *gin.Engine
-	userID uint
+	db         *gorm.DB
+	router     *gin.Engine
+	userID     uint
 	businessID uint
 }
 
@@ -94,15 +94,21 @@ func setupTestRouter(db *gorm.DB) (*gin.Engine, error) {
 	cardRepo := postgresRepo.NewLoyaltyCardRepository(db)
 	categoryRepo := postgresRepo.NewCategoryRepository(db)
 	cityRepo := postgresRepo.NewCityRepository(db)
+	employeeRepo := postgresRepo.NewEmployeeRepository(db)
+	redemptionRepo := postgresRepo.NewBonusRedemptionRepository(db)
+	qrCodeRepo := postgresRepo.NewQRCodeRepository(db)
 
 	authUsecase := usecase.NewAuthUsecase(userRepo)
 	businessUsecase := usecase.NewBusinessUsecase(businessRepo)
 	programUsecase := usecase.NewBonusProgramUsecase(programRepo, businessRepo)
-	cardUsecase := usecase.NewLoyaltyCardUsecase(cardRepo)
+	employeeUsecase := usecase.NewEmployeeUsecase(employeeRepo, businessRepo, userRepo)
+	cardUsecase := usecase.NewLoyaltyCardUsecase(cardRepo, businessRepo, employeeUsecase)
 	categoryUsecase := usecase.NewCategoryUsecase(categoryRepo)
 	cityUsecase := usecase.NewCityUsecase(cityRepo)
+	redemptionUsecase := usecase.NewBonusRedemptionUsecase(redemptionRepo, cardRepo, businessRepo, employeeUsecase)
+	qrCodeUsecase := usecase.NewQRCodeUsecase(qrCodeRepo, programRepo, businessRepo)
 
-	router := SetupRouter(authUsecase, businessUsecase, programUsecase, cardUsecase, categoryUsecase, cityUsecase)
+	router := SetupRouter(authUsecase, businessUsecase, programUsecase, cardUsecase, categoryUsecase, cityUsecase, employeeUsecase, redemptionUsecase, qrCodeUsecase)
 	return router, nil
 }
 
@@ -174,17 +180,17 @@ func seedTestData(db *gorm.DB) error {
 
 	// Seed test business
 	testBusiness := entity.Business{
-		Name:            "Test Business",
-		Category:        "coffee",
-		Address:         "Test Address 123",
-		Rating:          4.5,
-		IsOpen:          true,
+		Name:              "Test Business",
+		Category:          "coffee",
+		Address:           "Test Address 123",
+		Rating:            4.5,
+		IsOpen:            true,
 		HasLoyaltyProgram: true,
-		Featured:        false,
-		Status:          entity.BusinessStatusApproved,
-		OwnerID:         testUser.ID,
-		Icon:            "☕",
-		IconColor:       "#8B5CF6",
+		Featured:          false,
+		Status:            entity.BusinessStatusApproved,
+		OwnerID:           testUser.ID,
+		Icon:              "☕",
+		IconColor:         "#8B5CF6",
 	}
 	testBusiness.CreatedAt = time.Now()
 	testBusiness.UpdatedAt = time.Now()
@@ -195,22 +201,22 @@ func seedTestData(db *gorm.DB) error {
 	// Seed test bonus programs
 	programs := []entity.BonusProgram{
 		{
-			Name:          "Test Program 1",
-			Description:   "Test description 1",
-			BusinessID:    testBusiness.ID,
+			Name:           "Test Program 1",
+			Description:    "Test description 1",
+			BusinessID:     testBusiness.ID,
 			PointsRequired: 10,
-			Discount:      20,
-			DiscountType: "percentage",
-			Status:        entity.BonusProgramStatusPending,
+			Discount:       20,
+			DiscountType:   "percentage",
+			Status:         entity.BonusProgramStatusPending,
 		},
 		{
-			Name:          "Test Program 2",
-			Description:   "Test description 2",
-			BusinessID:    testBusiness.ID,
+			Name:           "Test Program 2",
+			Description:    "Test description 2",
+			BusinessID:     testBusiness.ID,
 			PointsRequired: 15,
-			Discount:      30,
-			DiscountType: "percentage",
-			Status:        entity.BonusProgramStatusApproved,
+			Discount:       30,
+			DiscountType:   "percentage",
+			Status:         entity.BonusProgramStatusApproved,
 		},
 	}
 	for i := range programs {
@@ -284,7 +290,7 @@ func (suite *APITestSuite) TestAuthRegister() {
 	// Get first city ID from database
 	var city entity.City
 	suite.db.First(&city)
-	
+
 	body := map[string]interface{}{
 		"email":    "newuser@example.com",
 		"password": "password123",
@@ -353,9 +359,9 @@ func (suite *APITestSuite) TestBusinessGetMyBusiness() {
 func (suite *APITestSuite) TestBusinessCreate() {
 	userID := suite.getTestUserID()
 	body := map[string]interface{}{
-		"name":            "New Test Business",
-		"category":        "coffee",
-		"address":         "New Address 456",
+		"name":              "New Test Business",
+		"category":          "coffee",
+		"address":           "New Address 456",
 		"hasLoyaltyProgram": true,
 	}
 	req := createAuthRequest("POST", "/api/businesses", body, userID)
@@ -377,7 +383,7 @@ func (suite *APITestSuite) TestBonusProgramGetByID() {
 	// Get first program ID from database
 	var program entity.BonusProgram
 	suite.db.First(&program)
-	
+
 	req := createRequest("GET", fmt.Sprintf("/api/bonus-programs/%d", program.ID), nil)
 	recorder := executeRequest(suite.router, req)
 
@@ -400,12 +406,12 @@ func (suite *APITestSuite) TestBonusProgramCreate() {
 	userID := suite.getTestUserID()
 	businessID := suite.getTestBusinessID()
 	body := map[string]interface{}{
-		"name":          "New Test Program",
-		"description":   "Test description",
-		"businessId":   businessID,
+		"name":           "New Test Program",
+		"description":    "Test description",
+		"businessId":     businessID,
 		"pointsRequired": 20,
-		"discount":     25,
-		"discountType": "percentage",
+		"discount":       25,
+		"discountType":   "percentage",
 	}
 	req := createAuthRequest("POST", "/api/bonus-programs", body, userID)
 	recorder := executeRequest(suite.router, req)
