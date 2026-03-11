@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: stempo_password
       POSTGRES_DB: stempo_db
     ports:
-      - "5432:5432"
+      - "5433:5433"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,7 +23,7 @@ services:
     container_name: stempo_backend
     environment:
       DB_HOST: postgres
-      DB_PORT: 5432
+      DB_PORT: 5433
       DB_USER: stempo
       DB_PASSWORD: stempo_password
       DB_NAME: stempo_db
