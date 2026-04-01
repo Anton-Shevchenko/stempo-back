@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -599,7 +600,8 @@ func seedBusinesses(db *gorm.DB) error {
 		}
 
 		var existing entity.Business
-		err := db.Where("name = ?", businesses[i].Name).First(&existing).Error
+		// Scope by owner so a same-named business from another user does not block demo inserts
+		err := db.Where("owner_id = ? AND name = ?", owner.ID, businesses[i].Name).First(&existing).Error
 		if err == nil {
 			if existing.Status != entity.BusinessStatusApproved {
 				if err := db.Model(&existing).Update("status", entity.BusinessStatusApproved).Error; err != nil {
@@ -630,20 +632,25 @@ func seedBonusPrograms(db *gorm.DB) error {
 		return nil
 	}
 
+	var demoOwner entity.User
+	if err := db.Where("email = ?", "business@example.com").First(&demoOwner).Error; err != nil {
+		return err
+	}
+
 	var joesCoffee, zenYoga, bellaPasta, smoothieBar, bookworm entity.Business
-	if err := db.Where("name = ?", "Joe's Coffee").First(&joesCoffee).Error; err != nil {
+	if err := demoBusinessByOwnerName(db, demoOwner.ID, "Joe's Coffee", &joesCoffee); err != nil {
 		return err
 	}
-	if err := db.Where("name = ?", "Zen Yoga").First(&zenYoga).Error; err != nil {
+	if err := demoBusinessByOwnerName(db, demoOwner.ID, "Zen Yoga", &zenYoga); err != nil {
 		return err
 	}
-	if err := db.Where("name = ?", "Bella Pasta").First(&bellaPasta).Error; err != nil {
+	if err := demoBusinessByOwnerName(db, demoOwner.ID, "Bella Pasta", &bellaPasta); err != nil {
 		return err
 	}
-	if err := db.Where("name = ?", "Green Smoothie Bar").First(&smoothieBar).Error; err != nil {
+	if err := demoBusinessByOwnerName(db, demoOwner.ID, "Green Smoothie Bar", &smoothieBar); err != nil {
 		return err
 	}
-	if err := db.Where("name = ?", "Bookworm Café").First(&bookworm).Error; err != nil {
+	if err := demoBusinessByOwnerName(db, demoOwner.ID, "Bookworm Café", &bookworm); err != nil {
 		return err
 	}
 
@@ -743,11 +750,16 @@ func seedLoyaltyCards(db *gorm.DB) error {
 		return err
 	}
 
-	var business1, business2 entity.Business
-	if err := db.Where("name = ?", "Joe's Coffee").First(&business1).Error; err != nil {
+	var demoOwner entity.User
+	if err := db.Where("email = ?", "business@example.com").First(&demoOwner).Error; err != nil {
 		return err
 	}
-	if err := db.Where("name = ?", "Zen Yoga").First(&business2).Error; err != nil {
+
+	var business1, business2 entity.Business
+	if err := demoBusinessByOwnerName(db, demoOwner.ID, "Joe's Coffee", &business1); err != nil {
+		return err
+	}
+	if err := demoBusinessByOwnerName(db, demoOwner.ID, "Zen Yoga", &business2); err != nil {
 		return err
 	}
 
@@ -775,6 +787,17 @@ func seedLoyaltyCards(db *gorm.DB) error {
 	}
 
 	log.Printf("Seeded %d loyalty cards", len(cards))
+	return nil
+}
+
+func demoBusinessByOwnerName(db *gorm.DB, ownerID uint, name string, dest *entity.Business) error {
+	err := db.Where("owner_id = ? AND name = ?", ownerID, name).First(dest).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("demo business %q for business@example.com missing — run full seed (seedBusinesses before bonus programs)", name)
+		}
+		return err
+	}
 	return nil
 }
 
