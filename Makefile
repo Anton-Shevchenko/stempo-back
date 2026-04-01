@@ -1,43 +1,57 @@
 .PHONY: build run migrate seed docker-up docker-down docker-build docker-logs docker-restart docker-migrate docker-seed docker-shell test test-coverage
 
+# Docker Compose v2: `docker compose`. Override if needed: make docker-seed COMPOSE=docker-compose
+COMPOSE ?= docker compose
+
+# Host cannot resolve service name "postgres" — use docker-seed / docker-migrate, or DB_HOST=127.0.0.1 DB_PORT=5433
+check-db-host-for-local:
+	@if [ -f .env ] && grep -qE '^[[:space:]]*DB_HOST[[:space:]]*=[[:space:]]*postgres[[:space:]]*$$' .env; then \
+		echo "DB_HOST=postgres only works inside Docker. On the server run:"; \
+		echo "  $(COMPOSE) exec backend ./server seed"; \
+		echo "  (or: make docker-seed)"; \
+		echo "Or from this machine with published DB port:"; \
+		echo "  DB_HOST=127.0.0.1 DB_PORT=5433 make seed"; \
+		exit 1; \
+	fi
+
 build:
 	go build -o bin/server ./cmd/server
 
 run:
 	go run ./cmd/server
 
-migrate:
+migrate: check-db-host-for-local
 	go run ./cmd/server migrate
 
-seed:
+seed: check-db-host-for-local
 	go run ./cmd/server seed
 
 docker-up:
-	docker-compose up -d
+	$(COMPOSE) up -d
 
 docker-down:
-	docker-compose down
+	$(COMPOSE) down
 
 docker-build:
-	docker-compose build
+	$(COMPOSE) build
 
 docker-logs:
-	docker-compose logs -f backend
+	$(COMPOSE) logs -f backend
 
 docker-restart:
-	docker-compose restart backend
+	$(COMPOSE) restart backend
 
 docker-migrate:
-	docker-compose exec backend ./server migrate
+	$(COMPOSE) exec backend ./server migrate
 
 docker-seed:
-	@docker-compose exec -T backend ./server seed 2>&1 | grep -v "SELECT\|FROM\|WHERE\|JOIN\|INFORMATION_SCHEMA\|pg_\|rows:\|bind:" | grep -E "(Starting|Seeded|completed|error|Error)" || true
+	@$(COMPOSE) exec -T backend ./server seed 2>&1 | grep -v "SELECT\|FROM\|WHERE\|JOIN\|INFORMATION_SCHEMA\|pg_\|rows:\|bind:" | grep -E "(Starting|Seeded|completed|error|Error)" || true
 
 docker-shell:
-	docker-compose exec backend sh
+	$(COMPOSE) exec backend sh
 
 docker-up-build:
-	docker-compose up -d --build
+	$(COMPOSE) up -d --build
 
 docker-reset: docker-down docker-up-build
 	@sleep 5
@@ -57,9 +71,10 @@ help:
 	@echo "  make docker-down        - Stop Docker containers"
 	@echo "  make docker-build       - Build Docker images"
 	@echo "  make docker-restart     - Restart backend container"
-	@echo "  make docker-migrate    - Run migrations in container"
-	@echo "  make docker-seed       - Run seeders in container"
+	@echo "  make docker-migrate     - Run migrations in container (use on server)"
+	@echo "  make docker-seed        - Run seeders in container (use on server)"
+	@echo "  make migrate / seed     - Run on host; needs DB_HOST=127.0.0.1 DB_PORT=5433 if DB is in Docker"
 	@echo "  make docker-shell       - Open shell in backend container"
-	@echo "  make docker-reset      - Reset and setup database (down, up, migrate, seed)"
+	@echo "  make docker-reset       - Reset and setup database (down, up, migrate, seed)"
 	@echo "  make test               - Run tests"
 	@echo "  make test-coverage      - Run tests with coverage"
