@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -174,13 +175,6 @@ func seedCategories(db *gorm.DB) error {
 }
 
 func seedUsers(db *gorm.DB) error {
-	var count int64
-	db.Model(&entity.User{}).Count(&count)
-	if count > 0 {
-		log.Println("Users already seeded, skipping...")
-		return nil
-	}
-
 	hashedPassword, err := hashPassword("admin123")
 	if err != nil {
 		return err
@@ -207,28 +201,36 @@ func seedUsers(db *gorm.DB) error {
 		},
 	}
 
+	var inserted int
 	for i := range users {
+		var existing entity.User
+		err := db.Where("email = ?", users[i].Email).First(&existing).Error
+		if err == nil {
+			continue
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 		users[i].CreatedAt = time.Now()
 		users[i].UpdatedAt = time.Now()
 		if err := db.Create(&users[i]).Error; err != nil {
 			return err
 		}
+		inserted++
+		log.Printf("Seeded user %s", users[i].Email)
 	}
-
-	log.Printf("Seeded %d users", len(users))
+	if inserted > 0 {
+		log.Printf("Inserted %d new seed users (others already existed)", inserted)
+	}
 	return nil
 }
 
 func seedBusinesses(db *gorm.DB) error {
-	var count int64
-	db.Model(&entity.Business{}).Count(&count)
-	if count > 0 {
-		log.Println("Businesses already seeded, skipping...")
-		return nil
-	}
-
 	var owner entity.User
 	if err := db.Where("email = ?", "business@example.com").First(&owner).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("seed user business@example.com missing: run seed after seedUsers or insert demo users")
+		}
 		return err
 	}
 
@@ -588,19 +590,35 @@ func seedBusinesses(db *gorm.DB) error {
 		},
 	}
 
+	var inserted, approved int
 	for i := range businesses {
 		businesses[i].CreatedAt = time.Now()
 		businesses[i].UpdatedAt = time.Now()
-		// Set status to approved if not already set
 		if businesses[i].Status == "" {
 			businesses[i].Status = entity.BusinessStatusApproved
+		}
+
+		var existing entity.Business
+		err := db.Where("name = ?", businesses[i].Name).First(&existing).Error
+		if err == nil {
+			if existing.Status != entity.BusinessStatusApproved {
+				if err := db.Model(&existing).Update("status", entity.BusinessStatusApproved).Error; err != nil {
+					return err
+				}
+				approved++
+			}
+			continue
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
 		}
 		if err := db.Create(&businesses[i]).Error; err != nil {
 			return err
 		}
+		inserted++
 	}
 
-	log.Printf("Seeded %d businesses", len(businesses))
+	log.Printf("Demo businesses synced: %d inserted, %d existing rows set to approved", inserted, approved)
 	return nil
 }
 

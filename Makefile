@@ -3,15 +3,23 @@
 # Docker Compose v2: `docker compose`. Override if needed: make docker-seed COMPOSE=docker-compose
 COMPOSE ?= docker compose
 
-# Host cannot resolve service name "postgres" — use docker-seed / docker-migrate, or DB_HOST=127.0.0.1 DB_PORT=5433
+# Host cannot resolve Docker DNS names — use docker-seed / docker-migrate, or DB_HOST=127.0.0.1 DB_PORT=5433
 check-db-host-for-local:
-	@if [ -f .env ] && grep -qE '^[[:space:]]*DB_HOST[[:space:]]*=[[:space:]]*postgres[[:space:]]*$$' .env; then \
-		echo "DB_HOST=postgres only works inside Docker. On the server run:"; \
-		echo "  $(COMPOSE) exec backend ./server seed"; \
-		echo "  (or: make docker-seed)"; \
-		echo "Or from this machine with published DB port:"; \
-		echo "  DB_HOST=127.0.0.1 DB_PORT=5433 make seed"; \
-		exit 1; \
+	@if [ -f .env ]; then \
+		if grep -qE '^[[:space:]]*DB_HOST[[:space:]]*=[[:space:]]*stempo_backend[[:space:]]*$$' .env; then \
+			echo "DB_HOST=stempo_backend is wrong: that is the backend API container name, not PostgreSQL."; \
+			echo "In .env set: DB_HOST=postgres  (the docker-compose service name for the database)."; \
+			echo "Then: docker compose up -d --force-recreate backend  (to reload env)"; \
+			echo "Seeds: make docker-seed"; \
+			exit 1; \
+		elif grep -qE '^[[:space:]]*DB_HOST[[:space:]]*=[[:space:]]*postgres[[:space:]]*$$' .env; then \
+			echo "DB_HOST=postgres only works inside Docker. On the server run:"; \
+			echo "  $(COMPOSE) exec backend ./server seed"; \
+			echo "  (or: make docker-seed)"; \
+			echo "Or from host with published DB port:"; \
+			echo "  DB_HOST=127.0.0.1 DB_PORT=5433 make seed"; \
+			exit 1; \
+		fi; \
 	fi
 
 build:
@@ -45,7 +53,7 @@ docker-migrate:
 	$(COMPOSE) exec backend ./server migrate
 
 docker-seed:
-	@$(COMPOSE) exec -T backend ./server seed 2>&1 | grep -v "SELECT\|FROM\|WHERE\|JOIN\|INFORMATION_SCHEMA\|pg_\|rows:\|bind:" | grep -E "(Starting|Seeded|completed|error|Error)" || true
+	$(COMPOSE) exec -T backend ./server seed
 
 docker-shell:
 	$(COMPOSE) exec backend sh
