@@ -30,6 +30,11 @@ func (m *MockBonusProgramRepository) FindByBusinessID(businessID uint) ([]entity
 	return args.Get(0).([]entity.BonusProgram), args.Error(1)
 }
 
+func (m *MockBonusProgramRepository) FindActiveByBusinessID(businessID uint) ([]entity.BonusProgram, error) {
+	args := m.Called(businessID)
+	return args.Get(0).([]entity.BonusProgram), args.Error(1)
+}
+
 func (m *MockBonusProgramRepository) FindAll(page, pageSize int) ([]entity.BonusProgram, int64, error) {
 	args := m.Called(page, pageSize)
 	return args.Get(0).([]entity.BonusProgram), args.Get(1).(int64), args.Error(2)

@@ -8,6 +8,7 @@ type LoyaltyCardRepository interface {
 	FindByUserID(userID uint) ([]entity.LoyaltyCard, error)
 	FindByBusinessID(businessID uint) ([]entity.LoyaltyCard, error)
 	FindByUserAndBusiness(userID, businessID uint) (*entity.LoyaltyCard, error)
+	FindByUserIDAndBusinessID(userID, businessID uint) ([]entity.LoyaltyCard, error)
 	Update(card *entity.LoyaltyCard) error
 	Delete(id uint) error
 }

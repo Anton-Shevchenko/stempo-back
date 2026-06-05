@@ -3,28 +3,34 @@ package usecase
 import (
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stempo/backend/internal/domain/entity"
 	"github.com/stempo/backend/internal/domain/repository"
+	"github.com/stempo/backend/internal/infrastructure/oauth"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthUsecase interface {
 	Register(email, password string, name, phone *string, cityID *uint) (*entity.User, string, string, error)
 	Login(email, password string) (*entity.User, string, string, error)
+	LoginWithGoogle(idToken string) (*entity.User, string, string, error)
 	Refresh(refreshToken string) (string, error)
 	GetCurrentUser(userID uint) (*entity.User, error)
 	UpdateProfile(userID uint, name, phone *string, cityID *uint) (*entity.User, error)
+	ChangePassword(userID uint, currentPassword, newPassword string) error
+	SetPasswordFromInvite(token, password string) (*entity.User, string, string, error)
 }
 
 type authUsecase struct {
-	userRepo repository.UserRepository
+	userRepo        repository.UserRepository
+	googleVerifier  oauth.GoogleTokenVerifier
 }
 
-func NewAuthUsecase(userRepo repository.UserRepository) AuthUsecase {
-	return &authUsecase{userRepo: userRepo}
+func NewAuthUsecase(userRepo repository.UserRepository, googleVerifier oauth.GoogleTokenVerifier) AuthUsecase {
+	return &authUsecase{userRepo: userRepo, googleVerifier: googleVerifier}
 }
 
 const (
@@ -74,9 +80,81 @@ func (u *authUsecase) Login(email, password string) (*entity.User, string, strin
 		return nil, "", "", errors.New("invalid email or password")
 	}
 
+	if user.Password == "" {
+		return nil, "", "", errors.New("invalid email or password")
+	}
+
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
 		return nil, "", "", errors.New("invalid email or password")
+	}
+
+	token, err := u.generateToken(user.ID, accessTokenTTL)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	refreshToken, err := u.generateRefreshToken(user.ID)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	return user, token, refreshToken, nil
+}
+
+func (u *authUsecase) LoginWithGoogle(idToken string) (*entity.User, string, string, error) {
+	googleUser, err := u.googleVerifier.Verify(idToken)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	adminEmail := os.Getenv("ADMIN_EMAIL")
+	if adminEmail == "" {
+		adminEmail = "admin@stempo.com"
+	}
+	if strings.EqualFold(googleUser.Email, adminEmail) {
+		return nil, "", "", errors.New("this email is reserved for admin")
+	}
+
+	user, err := u.userRepo.FindByGoogleID(googleUser.GoogleID)
+	if err != nil || user == nil {
+		existingUser, emailErr := u.userRepo.FindByEmail(googleUser.Email)
+		if emailErr == nil && existingUser != nil {
+			user = existingUser
+			user.GoogleID = &googleUser.GoogleID
+			if user.Name == nil && googleUser.Name != "" {
+				name := googleUser.Name
+				user.Name = &name
+			}
+			if user.AvatarURL == nil && googleUser.Picture != "" {
+				picture := googleUser.Picture
+				user.AvatarURL = &picture
+			}
+			if err := u.userRepo.Update(user); err != nil {
+				return nil, "", "", err
+			}
+		} else {
+			var name *string
+			if googleUser.Name != "" {
+				n := googleUser.Name
+				name = &n
+			}
+			var avatarURL *string
+			if googleUser.Picture != "" {
+				p := googleUser.Picture
+				avatarURL = &p
+			}
+			googleID := googleUser.GoogleID
+			user = &entity.User{
+				Email:     googleUser.Email,
+				GoogleID:  &googleID,
+				Name:      name,
+				AvatarURL: avatarURL,
+			}
+			if err := u.userRepo.Create(user); err != nil {
+				return nil, "", "", err
+			}
+		}
 	}
 
 	token, err := u.generateToken(user.ID, accessTokenTTL)
@@ -110,6 +188,42 @@ func (u *authUsecase) GetCurrentUser(userID uint) (*entity.User, error) {
 	return u.userRepo.FindByID(userID)
 }
 
+func (u *authUsecase) SetPasswordFromInvite(token, password string) (*entity.User, string, string, error) {
+	user, err := u.userRepo.FindByInviteToken(token)
+	if err != nil || user == nil {
+		return nil, "", "", errors.New("invalid or expired invite token")
+	}
+
+	if user.InviteTokenExpiry != nil && time.Now().After(*user.InviteTokenExpiry) {
+		return nil, "", "", errors.New("invite token has expired")
+	}
+
+	hashedPassword, err := hashPassword(password)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	user.Password = hashedPassword
+	user.InviteToken = nil
+	user.InviteTokenExpiry = nil
+
+	if err := u.userRepo.Update(user); err != nil {
+		return nil, "", "", err
+	}
+
+	accessToken, err := u.generateToken(user.ID, accessTokenTTL)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	refreshToken, err := u.generateRefreshToken(user.ID)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	return user, accessToken, refreshToken, nil
+}
+
 func (u *authUsecase) UpdateProfile(userID uint, name, phone *string, cityID *uint) (*entity.User, error) {
 	user, err := u.userRepo.FindByID(userID)
 	if err != nil || user == nil {
@@ -131,6 +245,29 @@ func (u *authUsecase) UpdateProfile(userID uint, name, phone *string, cityID *ui
 	}
 
 	return user, nil
+}
+
+func (u *authUsecase) ChangePassword(userID uint, currentPassword, newPassword string) error {
+	user, err := u.userRepo.FindByID(userID)
+	if err != nil || user == nil {
+		return errors.New("user not found")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(currentPassword)); err != nil {
+		return errors.New("current password is incorrect")
+	}
+
+	if currentPassword == newPassword {
+		return errors.New("new password must be different from current password")
+	}
+
+	hashedPassword, err := hashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	user.Password = hashedPassword
+	return u.userRepo.Update(user)
 }
 
 func (u *authUsecase) generateToken(userID uint, ttl time.Duration) (string, error) {

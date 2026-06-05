@@ -1,4 +1,4 @@
-.PHONY: build run migrate seed docker-up docker-down docker-build docker-logs docker-restart docker-migrate docker-seed docker-shell test test-coverage
+.PHONY: build run migrate seed docker-up docker-down docker-build docker-rebuild-backend docker-logs docker-restart docker-migrate docker-seed docker-shell test test-coverage
 
 # Docker Compose v2: `docker compose`. Override if needed: make docker-seed COMPOSE=docker-compose
 COMPOSE ?= docker compose
@@ -43,6 +43,10 @@ docker-down:
 docker-build:
 	$(COMPOSE) build
 
+# Use when backend still runs old ./server after seeder changes (no --no-cache = stale layers)
+docker-rebuild-backend:
+	$(COMPOSE) build --no-cache backend
+
 docker-logs:
 	$(COMPOSE) logs -f backend
 
@@ -53,6 +57,7 @@ docker-migrate:
 	$(COMPOSE) exec backend ./server migrate
 
 docker-seed:
+	@echo "Tip: if seed errors look like old code (SQL without owner_id), run: make docker-rebuild-backend && $(COMPOSE) up -d backend"
 	$(COMPOSE) exec -T backend ./server seed
 
 docker-shell:
@@ -78,6 +83,7 @@ help:
 	@echo "  make docker-up          - Start Docker containers"
 	@echo "  make docker-down        - Stop Docker containers"
 	@echo "  make docker-build       - Build Docker images"
+	@echo "  make docker-rebuild-backend - Rebuild backend image with --no-cache (after seeder/API code changes)"
 	@echo "  make docker-restart     - Restart backend container"
 	@echo "  make docker-migrate     - Run migrations in container (use on server)"
 	@echo "  make docker-seed        - Run seeders in container (use on server)"

@@ -1,0 +1,10 @@
+server
+bin/
+.git
+.github
+*.md
+.env
+.env.*
+docker-compose*.yml
+coverage.out
+*.html

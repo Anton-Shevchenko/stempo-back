@@ -30,6 +30,12 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       PORT: ${PORT:-3000}
       GIN_MODE: ${GIN_MODE:-release}
+      MAILJET_API_KEY: ${MAILJET_API_KEY}
+      MAILJET_SECRET_KEY: ${MAILJET_SECRET_KEY}
+      MAILJET_FROM_EMAIL: ${MAILJET_FROM_EMAIL}
+      MAILJET_FROM_NAME: ${MAILJET_FROM_NAME:-Stempo}
+      APP_DEEP_LINK_BASE: ${APP_DEEP_LINK_BASE:-stempo://}
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
     ports:
       - "3000:3000"
     depends_on:

@@ -48,6 +48,14 @@ func (r *loyaltyCardRepository) FindByUserAndBusiness(userID, businessID uint) (
 	return &card, nil
 }
 
+func (r *loyaltyCardRepository) FindByUserIDAndBusinessID(userID, businessID uint) ([]entity.LoyaltyCard, error) {
+	var cards []entity.LoyaltyCard
+	err := r.db.Where("user_id = ? AND business_id = ?", userID, businessID).
+		Preload("BonusProgram").
+		Find(&cards).Error
+	return cards, err
+}
+
 func (r *loyaltyCardRepository) Update(card *entity.LoyaltyCard) error {
 	return r.db.Save(card).Error
 }

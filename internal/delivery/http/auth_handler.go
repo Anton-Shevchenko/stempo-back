@@ -32,6 +32,10 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type GoogleLoginRequest struct {
+	IDToken string `json:"idToken" binding:"required"`
+}
+
 type AuthResponse struct {
 	User         interface{} `json:"user"`
 	Token        string      `json:"token"`
@@ -145,6 +149,30 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
+func (h *AuthHandler) GoogleLogin(c *gin.Context) {
+	var req GoogleLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, token, refreshToken, err := h.authUsecase.LoginWithGoogle(req.IDToken)
+	if err != nil {
+		status := http.StatusUnauthorized
+		if err.Error() == "this email is reserved for admin" {
+			status = http.StatusForbidden
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, AuthResponse{
+		User:         user,
+		Token:        token,
+		RefreshToken: refreshToken,
+	})
+}
+
 func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
@@ -207,4 +235,59 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
+}
+
+type SetPasswordRequest struct {
+	Token    string `json:"token" binding:"required"`
+	Password string `json:"password" binding:"required,min=6"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword" binding:"required"`
+	NewPassword     string `json:"newPassword" binding:"required,min=6"`
+}
+
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authUsecase.ChangePassword(userID.(uint), req.CurrentPassword, req.NewPassword); err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "user not found" {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
+}
+
+func (h *AuthHandler) SetPassword(c *gin.Context) {
+	var req SetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, token, refreshToken, err := h.authUsecase.SetPasswordFromInvite(req.Token, req.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, AuthResponse{
+		User:         user,
+		Token:        token,
+		RefreshToken: refreshToken,
+	})
 }

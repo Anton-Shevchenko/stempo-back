@@ -8,6 +8,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/stempo/backend/internal/delivery/http"
 	"github.com/stempo/backend/internal/infrastructure/database"
+	"github.com/stempo/backend/internal/infrastructure/email"
+	"github.com/stempo/backend/internal/infrastructure/oauth"
 	"github.com/stempo/backend/internal/repository/postgres"
 	"github.com/stempo/backend/internal/usecase"
 )
@@ -75,10 +77,13 @@ func runServer() {
 	redemptionRepo := postgres.NewBonusRedemptionRepository(db)
 	qrCodeRepo := postgres.NewQRCodeRepository(db)
 
-	authUsecase := usecase.NewAuthUsecase(userRepo)
+	emailSvc := email.NewMailjetService()
+
+	googleVerifier := oauth.NewGoogleTokenVerifier()
+	authUsecase := usecase.NewAuthUsecase(userRepo, googleVerifier)
 	businessUsecase := usecase.NewBusinessUsecase(businessRepo)
 	programUsecase := usecase.NewBonusProgramUsecase(programRepo, businessRepo)
-	employeeUsecase := usecase.NewEmployeeUsecase(employeeRepo, businessRepo, userRepo)
+	employeeUsecase := usecase.NewEmployeeUsecase(employeeRepo, businessRepo, userRepo, emailSvc)
 	cardUsecase := usecase.NewLoyaltyCardUsecase(cardRepo, businessRepo, employeeUsecase)
 	redemptionUsecase := usecase.NewBonusRedemptionUsecase(redemptionRepo, cardRepo, businessRepo, employeeUsecase)
 	categoryUsecase := usecase.NewCategoryUsecase(categoryRepo)

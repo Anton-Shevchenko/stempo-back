@@ -14,6 +14,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stempo/backend/internal/domain/entity"
 	"github.com/stempo/backend/internal/infrastructure/database"
+	"github.com/stempo/backend/internal/infrastructure/email"
+	"github.com/stempo/backend/internal/infrastructure/oauth"
 	postgresRepo "github.com/stempo/backend/internal/repository/postgres"
 	"github.com/stempo/backend/internal/usecase"
 	"github.com/stretchr/testify/assert"
@@ -98,10 +100,10 @@ func setupTestRouter(db *gorm.DB) (*gin.Engine, error) {
 	redemptionRepo := postgresRepo.NewBonusRedemptionRepository(db)
 	qrCodeRepo := postgresRepo.NewQRCodeRepository(db)
 
-	authUsecase := usecase.NewAuthUsecase(userRepo)
+	authUsecase := usecase.NewAuthUsecase(userRepo, oauth.NewGoogleTokenVerifier())
 	businessUsecase := usecase.NewBusinessUsecase(businessRepo)
 	programUsecase := usecase.NewBonusProgramUsecase(programRepo, businessRepo)
-	employeeUsecase := usecase.NewEmployeeUsecase(employeeRepo, businessRepo, userRepo)
+	employeeUsecase := usecase.NewEmployeeUsecase(employeeRepo, businessRepo, userRepo, email.NewMailjetService())
 	cardUsecase := usecase.NewLoyaltyCardUsecase(cardRepo, businessRepo, employeeUsecase)
 	categoryUsecase := usecase.NewCategoryUsecase(categoryRepo)
 	cityUsecase := usecase.NewCityUsecase(cityRepo)
@@ -394,6 +396,17 @@ func (suite *APITestSuite) TestBonusProgramGetByBusinessID() {
 	userID := suite.getTestUserID()
 	businessID := suite.getTestBusinessID()
 	req := createAuthRequest("GET", fmt.Sprintf("/api/bonus-programs/by-business/%d", businessID), nil, userID)
+	recorder := executeRequest(suite.router, req)
+
+	assert.Equal(suite.T(), 200, recorder.Code)
+	var programs []interface{}
+	json.Unmarshal(recorder.Body.Bytes(), &programs)
+	assert.IsType(suite.T(), []interface{}{}, programs)
+}
+
+func (suite *APITestSuite) TestBonusProgramGetPublicByBusinessID() {
+	businessID := suite.getTestBusinessID()
+	req := createRequest("GET", fmt.Sprintf("/api/bonus-programs/public/by-business/%d", businessID), nil)
 	recorder := executeRequest(suite.router, req)
 
 	assert.Equal(suite.T(), 200, recorder.Code)

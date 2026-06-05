@@ -36,6 +36,24 @@ func (r *userRepository) FindByEmail(email string) (*entity.User, error) {
 	return &user, nil
 }
 
+func (r *userRepository) FindByGoogleID(googleID string) (*entity.User, error) {
+	var user entity.User
+	err := r.db.Preload("City").Where("google_id = ?", googleID).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *userRepository) FindByInviteToken(token string) (*entity.User, error) {
+	var user entity.User
+	err := r.db.Preload("City").Where("invite_token = ?", token).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *userRepository) Update(user *entity.User) error {
 	return r.db.Save(user).Error
 }

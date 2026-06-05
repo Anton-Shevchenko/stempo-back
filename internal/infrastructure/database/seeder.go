@@ -12,7 +12,7 @@ import (
 )
 
 func Seed(db *gorm.DB) error {
-	log.Println("Starting database seeding...")
+	log.Println("Starting database seeding (build: owner-scoped businesses + bonus anchor ensure)...")
 
 	if err := seedCities(db); err != nil {
 		return err
@@ -27,6 +27,10 @@ func Seed(db *gorm.DB) error {
 	}
 
 	if err := seedBusinesses(db); err != nil {
+		return err
+	}
+
+	if err := ensureBonusAnchorBusinesses(db); err != nil {
 		return err
 	}
 
@@ -621,6 +625,115 @@ func seedBusinesses(db *gorm.DB) error {
 	}
 
 	log.Printf("Demo businesses synced: %d inserted, %d existing rows set to approved", inserted, approved)
+	return nil
+}
+
+// ensureBonusAnchorBusinesses guarantees the five businesses referenced by bonus programs exist for the
+// demo owner. Survives partial seeds, name collisions with other owners, and older seeder binaries.
+func ensureBonusAnchorBusinesses(db *gorm.DB) error {
+	var owner entity.User
+	if err := db.Where("email = ?", "business@example.com").First(&owner).Error; err != nil {
+		return fmt.Errorf("bonus anchors: demo owner: %w", err)
+	}
+
+	anchors := []entity.Business{
+		{
+			Name:              "Joe's Coffee",
+			Category:          "coffee",
+			Address:           "123 Main St, Downtown",
+			Rating:            4.8,
+			IsOpen:            true,
+			ImageURL:          stringPtr("https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400&h=400&fit=crop"),
+			Icon:              "☕",
+			IconColor:         "#8B5CF6",
+			Description:       stringPtr("Artisan coffee and fresh pastries"),
+			HasLoyaltyProgram: true,
+			Featured:          true,
+			Status:            entity.BusinessStatusApproved,
+		},
+		{
+			Name:              "Zen Yoga",
+			Category:          "sports",
+			Address:           "456 Oak Ave, Midtown",
+			Rating:            4.9,
+			IsOpen:            true,
+			ImageURL:          stringPtr("https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&h=400&fit=crop"),
+			Icon:              "🧘",
+			IconColor:         "#10B981",
+			Description:       stringPtr("Peaceful yoga classes for all levels"),
+			HasLoyaltyProgram: true,
+			Featured:          true,
+			Status:            entity.BusinessStatusApproved,
+		},
+		{
+			Name:              "Bella Pasta",
+			Category:          "food",
+			Address:           "789 Pine St, Uptown",
+			Rating:            4.7,
+			IsOpen:            true,
+			ImageURL:          stringPtr("https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop"),
+			Icon:              "🍝",
+			IconColor:         "#F59E0B",
+			Description:       stringPtr("Authentic Italian cuisine"),
+			HasLoyaltyProgram: false,
+			Featured:          true,
+			Status:            entity.BusinessStatusApproved,
+		},
+		{
+			Name:              "Green Smoothie Bar",
+			Category:          "food",
+			Address:           "321 Elm St, Downtown",
+			Rating:            4.6,
+			IsOpen:            true,
+			ImageURL:          stringPtr("https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&h=400&fit=crop"),
+			Icon:              "🥤",
+			IconColor:         "#10B981",
+			Description:       stringPtr("Fresh juices and healthy smoothies"),
+			HasLoyaltyProgram: true,
+			Featured:          true,
+			Status:            entity.BusinessStatusApproved,
+		},
+		{
+			Name:              "Bookworm Café",
+			Category:          "coffee",
+			Address:           "654 University Blvd",
+			Rating:            4.5,
+			IsOpen:            true,
+			ImageURL:          stringPtr("https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=400&fit=crop"),
+			Icon:              "📚",
+			IconColor:         "#6366F1",
+			Description:       stringPtr("Books, coffee, and cozy reading nooks"),
+			HasLoyaltyProgram: true,
+			Featured:          true,
+			Status:            entity.BusinessStatusApproved,
+		},
+	}
+
+	for i := range anchors {
+		anchors[i].OwnerID = owner.ID
+		now := time.Now()
+		anchors[i].CreatedAt = now
+		anchors[i].UpdatedAt = now
+
+		var existing entity.Business
+		err := db.Where("owner_id = ? AND name = ?", owner.ID, anchors[i].Name).First(&existing).Error
+		if err == nil {
+			if existing.Status != entity.BusinessStatusApproved {
+				if err := db.Model(&existing).Update("status", entity.BusinessStatusApproved).Error; err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err := db.Create(&anchors[i]).Error; err != nil {
+			return fmt.Errorf("bonus anchors: create %q: %w", anchors[i].Name, err)
+		}
+		log.Printf("ensureBonusAnchorBusinesses: inserted %q for demo owner", anchors[i].Name)
+	}
+
 	return nil
 }
 

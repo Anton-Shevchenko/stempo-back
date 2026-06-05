@@ -100,6 +100,27 @@ func (h *BonusProgramHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, program)
 }
 
+// GetPublicByBusinessID returns approved/active programs for a business (no auth required).
+// Route: GET /api/bonus-programs/public/by-business/:id
+func (h *BonusProgramHandler) GetPublicByBusinessID(c *gin.Context) {
+	businessID, ok := parseUintParam(c, "id")
+	if !ok {
+		return
+	}
+
+	programs, err := h.programUsecase.GetActiveByBusinessID(businessID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if programs == nil {
+		programs = []entity.BonusProgram{}
+	}
+
+	c.JSON(http.StatusOK, programs)
+}
+
 // GetByBusinessID returns all programs for a business
 // Requires authentication and verifies that the business belongs to the requesting user
 // Route: GET /api/bonus-programs/by-business/:id

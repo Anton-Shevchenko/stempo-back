@@ -64,6 +64,32 @@ func (h *LoyaltyCardHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, card)
 }
 
+func (h *LoyaltyCardHandler) GetByUserIDAndBusinessID(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	businessID, err := strconv.ParseUint(c.Param("businessId"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid business id"})
+		return
+	}
+
+	cards, err := h.cardUsecase.GetByUserIDAndBusinessID(userID, uint(businessID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if cards == nil {
+		cards = []entity.LoyaltyCard{}
+	}
+
+	c.JSON(http.StatusOK, cards)
+}
+
 func (h *LoyaltyCardHandler) GetByUserID(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {

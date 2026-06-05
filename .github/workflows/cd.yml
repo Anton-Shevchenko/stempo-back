@@ -17,9 +17,11 @@ jobs:
           script: |
             echo "--- Checking current directory ---"
             pwd
+            echo "--- Pulling latest code ---"
+            cd /root/stempo-back && git pull --rebase
             echo "--- Listing files in the project folder ---"
             ls -la /root/stempo-back
             echo "--- Checking Docker version ---"
             docker compose version || docker-compose version
             echo "--- Starting Deployment ---"
-            cd /root/stempo-back && docker compose pull && docker compose up -d
+            cd /root/stempo-back && docker compose pull && docker compose up -d --build

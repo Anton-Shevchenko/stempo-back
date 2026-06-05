@@ -58,10 +58,13 @@ func SetupRouter(
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/google", authHandler.GoogleLogin)
 			auth.POST("/refresh", authHandler.Refresh)
 			auth.POST("/logout", middleware.AuthMiddleware(), authHandler.Logout)
 			auth.GET("/me", middleware.AuthMiddleware(), authHandler.GetCurrentUser)
 			auth.PUT("/me", middleware.AuthMiddleware(), authHandler.UpdateProfile)
+			auth.PUT("/change-password", middleware.AuthMiddleware(), authHandler.ChangePassword)
+			auth.POST("/set-password", authHandler.SetPassword)
 		}
 
 		businessHandler := NewBusinessHandler(businessUsecase)
@@ -82,7 +85,8 @@ func SetupRouter(
 		programHandler := NewBonusProgramHandler(programUsecase, businessUsecase)
 		programs := api.Group("/bonus-programs")
 		{
-			// Specific route must come before parameterized routes
+			// Specific routes must come before parameterized routes
+			programs.GET("/public/by-business/:id", programHandler.GetPublicByBusinessID)
 			programs.GET("/by-business/:id", middleware.AuthMiddleware(), programHandler.GetByBusinessID)
 			programs.GET("", programHandler.GetAll)
 			programs.GET("/:id", programHandler.GetByID)
@@ -94,6 +98,7 @@ func SetupRouter(
 		cardHandler := NewLoyaltyCardHandler(cardUsecase)
 		cards := api.Group("/loyalty-cards")
 		{
+			cards.GET("/by-business/:businessId", middleware.AuthMiddleware(), cardHandler.GetByUserIDAndBusinessID)
 			cards.GET("", middleware.AuthMiddleware(), cardHandler.GetByUserID)
 			cards.GET("/:id", cardHandler.GetByID)
 			cards.POST("", middleware.AuthMiddleware(), cardHandler.Create)

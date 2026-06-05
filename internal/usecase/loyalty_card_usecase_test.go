@@ -53,6 +53,11 @@ func (m *MockLoyaltyCardRepository) FindByUserAndBusiness(userID, businessID uin
 	return args.Get(0).(*entity.LoyaltyCard), args.Error(1)
 }
 
+func (m *MockLoyaltyCardRepository) FindByUserIDAndBusinessID(userID, businessID uint) ([]entity.LoyaltyCard, error) {
+	args := m.Called(userID, businessID)
+	return args.Get(0).([]entity.LoyaltyCard), args.Error(1)
+}
+
 type MockEmployeeUsecase struct {
 	mock.Mock
 }

@@ -39,6 +39,17 @@ func (r *bonusProgramRepository) FindByBusinessID(businessID uint) ([]entity.Bon
 	return programs, err
 }
 
+// FindActiveByBusinessID returns only approved/active programs for public listing.
+func (r *bonusProgramRepository) FindActiveByBusinessID(businessID uint) ([]entity.BonusProgram, error) {
+	var programs []entity.BonusProgram
+	err := r.db.Where("business_id = ? AND status IN ?", businessID,
+		[]entity.BonusProgramStatus{entity.BonusProgramStatusApproved, entity.BonusProgramStatusActive}).
+		Preload("Business").
+		Order("created_at DESC").
+		Find(&programs).Error
+	return programs, err
+}
+
 func (r *bonusProgramRepository) FindByStatus(status entity.BonusProgramStatus, page, pageSize int) ([]entity.BonusProgram, int64, error) {
 	var programs []entity.BonusProgram
 	var total int64

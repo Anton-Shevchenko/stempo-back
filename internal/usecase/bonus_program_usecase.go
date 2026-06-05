@@ -11,6 +11,7 @@ type BonusProgramUsecase interface {
 	Create(program *entity.BonusProgram, userID uint) error
 	GetByID(id uint) (*entity.BonusProgram, error)
 	GetByBusinessID(businessID uint) ([]entity.BonusProgram, error)
+	GetActiveByBusinessID(businessID uint) ([]entity.BonusProgram, error)
 	GetAll(page, pageSize int) ([]entity.BonusProgram, int64, error)
 	GetByStatus(status entity.BonusProgramStatus, page, pageSize int) ([]entity.BonusProgram, int64, error)
 	Approve(id uint) error
@@ -75,6 +76,10 @@ func (u *bonusProgramUsecase) GetByID(id uint) (*entity.BonusProgram, error) {
 
 func (u *bonusProgramUsecase) GetByBusinessID(businessID uint) ([]entity.BonusProgram, error) {
 	return u.programRepo.FindByBusinessID(businessID)
+}
+
+func (u *bonusProgramUsecase) GetActiveByBusinessID(businessID uint) ([]entity.BonusProgram, error) {
+	return u.programRepo.FindActiveByBusinessID(businessID)
 }
 
 func (u *bonusProgramUsecase) GetAll(page, pageSize int) ([]entity.BonusProgram, int64, error) {

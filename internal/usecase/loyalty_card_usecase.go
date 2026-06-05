@@ -12,6 +12,7 @@ type LoyaltyCardUsecase interface {
 	GetByID(id uint) (*entity.LoyaltyCard, error)
 	GetByUserID(userID uint) ([]entity.LoyaltyCard, error)
 	GetByBusinessID(businessID uint) ([]entity.LoyaltyCard, error)
+	GetByUserIDAndBusinessID(userID, businessID uint) ([]entity.LoyaltyCard, error)
 	AddStamp(cardID, scannedByUserID uint) error
 	Update(card *entity.LoyaltyCard) error
 	Delete(id uint) error
@@ -54,6 +55,10 @@ func (u *loyaltyCardUsecase) GetByUserID(userID uint) ([]entity.LoyaltyCard, err
 
 func (u *loyaltyCardUsecase) GetByBusinessID(businessID uint) ([]entity.LoyaltyCard, error) {
 	return u.cardRepo.FindByBusinessID(businessID)
+}
+
+func (u *loyaltyCardUsecase) GetByUserIDAndBusinessID(userID, businessID uint) ([]entity.LoyaltyCard, error) {
+	return u.cardRepo.FindByUserIDAndBusinessID(userID, businessID)
 }
 
 func (u *loyaltyCardUsecase) AddStamp(cardID, scannedByUserID uint) error {
