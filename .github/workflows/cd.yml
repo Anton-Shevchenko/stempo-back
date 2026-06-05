@@ -15,13 +15,14 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "--- Checking current directory ---"
-            pwd
+            set -e
+            cd /root/stempo-back
             echo "--- Pulling latest code ---"
-            cd /root/stempo-back && git pull --rebase
-            echo "--- Listing files in the project folder ---"
-            ls -la /root/stempo-back
+            git fetch origin main
+            git reset --hard origin/main
             echo "--- Checking Docker version ---"
             docker compose version || docker-compose version
             echo "--- Starting Deployment ---"
-            cd /root/stempo-back && docker compose pull && docker compose up -d --build
+            docker compose pull
+            docker compose build --progress=plain backend
+            docker compose up -d
