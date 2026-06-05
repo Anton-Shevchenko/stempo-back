@@ -23,6 +23,7 @@ jobs:
             echo "--- Checking Docker version ---"
             docker compose version || docker-compose version
             echo "--- Starting Deployment ---"
+            docker builder prune -af || true
             docker compose pull
             docker compose build --progress=plain backend
             docker compose up -d
